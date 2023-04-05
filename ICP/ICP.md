@@ -9,3 +9,10 @@ This is usefule:
 
 TRY THIS:
 https://github.com/ulterzlw/icp_ceres/blob/master/main.cc
+
+Checkout this for the jacobian size
+https://ingmec.ual.es/~jlblanco/papers/jlblanco2010geometry3D_techrep.pdf
+
+Checkout the ceres library on the LocalParam for understanding the size of the jacobian
+
+Checkout that the size of the jacobian for the LocaParam can be different to the size of the jacobian for the CostFunc
