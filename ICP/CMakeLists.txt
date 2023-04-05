@@ -15,9 +15,9 @@ add_executable(ceres_test src/ceres_test.cc)
 add_executable(try_icp src/try_icp.cc)
 
 
-target_link_libraries(pcl_visul PRIVATE Ceres::ceres  ${PCL_LIBRARIES})
-target_link_libraries(ceres_test PRIVATE Ceres::ceres ${Sophus_LIBRARIES})
-target_link_libraries(try_icp PRIVATE Ceres::ceres ${PCL_LIBRARIES})
+target_link_libraries(pcl_visul PRIVATE ${CERES_LIBRARIES}  ${PCL_LIBRARIES})
+target_link_libraries(ceres_test PRIVATE  ${CERES_LIBRARIES} ${Sophus_LIBRARIES} fmt)
+target_link_libraries(try_icp PRIVATE ${CERES_LIBRARIES} ${PCL_LIBRARIES})
 
 
 
