@@ -21,4 +21,7 @@ Checkout that the size of the jacobian for the LocaParam can be different to the
 
 Checkout this for understanding more of LIE GROUP with ROBOTICS: http://ncfrn.mcgill.ca/members/pubs/barfoot_tro14.pdf
 
-[https://blog.csdn.net/hzwwpgmwy/article/details/86490556](https://xiaotaoguo.com/p/ceres-usage-2/) -> good
+archive above
+-----
+Loca and Cost Jacob:
+https://cgabc.xyz/posts/cfb7b6d6/
