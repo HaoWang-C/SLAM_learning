@@ -13,6 +13,12 @@ https://github.com/ulterzlw/icp_ceres/blob/master/main.cc
 Checkout this for the jacobian size
 https://ingmec.ual.es/~jlblanco/papers/jlblanco2010geometry3D_techrep.pdf
 
+try use Sophus DX_dir to see
+
 Checkout the ceres library on the LocalParam for understanding the size of the jacobian
 
 Checkout that the size of the jacobian for the LocaParam can be different to the size of the jacobian for the CostFunc
+
+Checkout this for understanding more of LIE GROUP with ROBOTICS: http://ncfrn.mcgill.ca/members/pubs/barfoot_tro14.pdf
+
+[https://blog.csdn.net/hzwwpgmwy/article/details/86490556](https://xiaotaoguo.com/p/ceres-usage-2/) -> good
