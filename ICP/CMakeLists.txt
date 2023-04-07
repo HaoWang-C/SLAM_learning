@@ -12,15 +12,10 @@ include_directories(${PCL_INCLUDE_DIRS})
 find_package(Sophus REQUIRED)
 include_directories(${Sophus_INCLUDE_DIRS})
 
+include_directories(include)
 
-add_executable(pcl_visul src/pcl_visul.cc)
-add_executable(ceres_test src/ceres_test.cc)
-add_executable(try_icp src/try_icp.cc)
-
-
-target_link_libraries(pcl_visul PRIVATE ${CERES_LIBRARIES}  ${PCL_LIBRARIES})
-target_link_libraries(ceres_test PRIVATE  ${CERES_LIBRARIES} ${Sophus_LIBRARIES} fmt::fmt)
-target_link_libraries(try_icp PRIVATE ${CERES_LIBRARIES} ${PCL_LIBRARIES})
+add_executable(registration src/registration.cc)
+target_link_libraries(registration PRIVATE  ${PCL_LIBRARIES} ${CERES_LIBRARIES} ${Sophus_LIBRARIES} fmt::fmt)
 
 
 
