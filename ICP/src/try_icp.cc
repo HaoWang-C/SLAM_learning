@@ -1,3 +1,8 @@
+#if __INTELLISENSE__
+#undef __ARM_NEON
+#undef __ARM_NEON__
+#endif
+
 #include <ceres/local_parameterization.h>
 #include <pcl/common/io.h>
 #include <pcl/common/transforms.h>
@@ -106,7 +111,6 @@ class RegistrationProblem {
   pcl::PointCloud<pcl::PointXYZ>::Ptr target_points_;
   pcl::PointCloud<pcl::PointXYZ>::Ptr source_points_;
   Eigen::Affine3f gt_transform_;
-
   pcl::KdTreeFLANN<pcl::PointXYZ> target_kdtree_;
   int num_neighbour_ = 10;
   // pairs of (target, source)
