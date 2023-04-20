@@ -1,7 +1,8 @@
 import numpy as np
 from collections import namedtuple
 import matplotlib.pyplot as plt
-
+import pdb
+from numpy.linalg import inv
 
 # Helper functions to get started
 class Graph:
@@ -198,14 +199,18 @@ def run_graph_slam(g, numIterations):
     for i in range(numIterations):
 
         # compute the incremental update dx of the state vector
-        
+        dx = linearize_and_solve(g)
         # apply the solution to the state vector g.x
-        
+        g.x = (g.x.reshape(g.x.shape[0],1) + dx).reshape(g.x.shape[0],)
         # plot graph
-        
+        plot_graph(g)
         # compute and print global error
-
+        total_error = compute_global_error(g)
+        print("total error: ", total_error)
         # terminate procedure if change is less than 10e-4
+        if( total_error < 10e-4):
+            break
+
 
 
 def compute_global_error(g):
@@ -239,23 +244,25 @@ def compute_global_error(g):
             info12 = edge.information
 
             # (TODO) compute the error due to this edge
+            e12 = t2v(inv(v2t(z12)) @ inv(v2t(x1)) @ v2t(x2)).reshape(3,1)
+            Fx +=  np.transpose(e12) @ info12 @ e12
 
-        # pose-pose constraint
-        elif edge.Type == 'L':
+        # # pose-pose constraint
+        # elif edge.Type == 'L':
 
-            # compute idx for nodes using lookup table
-            fromIdx = g.lut[edge.fromNode]
-            toIdx = g.lut[edge.toNode]
+        #     # compute idx for nodes using lookup table
+        #     fromIdx = g.lut[edge.fromNode]
+        #     toIdx = g.lut[edge.toNode]
 
-            # get node states for the current edge
-            x = g.x[fromIdx:fromIdx + 3]
-            l = g.x[toIdx:toIdx + 2]
+        #     # get node states for the current edge
+        #     x = g.x[fromIdx:fromIdx + 3]
+        #     l = g.x[toIdx:toIdx + 2]
 
-            # get measurement and information matrix for the edge
-            z = edge.measurement
-            info12 = edge.information
+        #     # get measurement and information matrix for the edge
+        #     z = edge.measurement
+        #     info12 = edge.information
 
-            # (TODO) compute the error due to this edge
+        #     # (TODO) compute the error due to this edge
 
     return Fx
 
@@ -276,7 +283,7 @@ def linearize_and_solve(g):
 
     # initialize the sparse H and the vector b
     H = np.zeros((len(g.x), len(g.x)))
-    b = np.zeros(len(g.x))
+    b = np.zeros(len(g.x)).reshape(1, len(g.x))
 
     # set flag to fix gauge
     needToAddPrior = True
@@ -293,6 +300,7 @@ def linearize_and_solve(g):
             # compute idx for nodes using lookup table
             fromIdx = g.lut[edge.fromNode]
             toIdx = g.lut[edge.toNode]
+            # g.lut -> (nodeID, Starting_Index_Of_StateVariable)
 
             # get node state for the current edge
             x_i = g.x[fromIdx:fromIdx + 3]
@@ -302,13 +310,21 @@ def linearize_and_solve(g):
             e, A, B = linearize_pose_pose_constraint(x_i, x_j, edge.measurement)
 
             # (TODO) compute the terms
-            b_i = 
-            b_j = 
-            H_ii = 
-            H_ij = 
-            H_jj = 
+            b_i = np.transpose(e) @ edge.information @ A
+            b_j = np.transpose(e) @ edge.information @ B
+            H_ii = np.transpose(A) @ edge.information @ A 
+            H_ij = np.transpose(A) @ edge.information @ B
+            H_ji = np.transpose(B) @ edge.information @ A
+            H_jj = np.transpose(B) @ edge.information @ B
 
             # (TODO) add the terms to H matrix and b
+            b[:,fromIdx:fromIdx + 3] += b_i
+            b[:,toIdx:toIdx + 3] += b_j
+            
+            H[fromIdx:fromIdx + 3, fromIdx:fromIdx + 3] += H_ii
+            H[fromIdx:fromIdx + 3, toIdx:toIdx + 3] += H_ij
+            H[toIdx:toIdx + 3, fromIdx:fromIdx + 3] += H_ji
+            H[toIdx:toIdx + 3, toIdx:toIdx + 3] += H_jj
 
             # Add the prior for one pose of this edge
             # This fixes one node to remain at its current location
@@ -335,17 +351,17 @@ def linearize_and_solve(g):
 
 
             # (TODO) compute the terms
-            b_i = 
-            b_j = 
-            H_ii = 
-            H_ij = 
-            H_jj = 
+            # b_i = 
+            # b_j = 
+            # H_ii = 
+            # H_ij = 
+            # H_jj = 
 
             # (TODO )add the terms to H matrix and b
 
 
     # solve system
-    dx = np.linalg.solve(H, b)
+    dx = np.linalg.solve(H, np.transpose(-b))
     
     return dx
 
@@ -371,9 +387,37 @@ def linearize_pose_pose_constraint(x1, x2, z):
     B  : 3x3
          Jacobian wrt x2
     """
+    # compute the error e = (z^-1) * (x1^-1) * (x2)
+    e = t2v(inv(v2t(z)) @ inv(v2t(x1)) @ v2t(x2)).reshape(3,1)
+    
+    # compute the A and B
+    # Get Ri and Rij
+    R_i = v2t(x1)[0:2,0:2]
+    R_ij = v2t(z)[0:2,0:2]
+    t_i = x1[0:2].reshape(2,1)
+    t_j = x2[0:2].reshape(2,1)
 
+    # d (R_i)^T / d theta_i
+    D_of_R = derivative_of_R_transpose_wrt_theta(x1[2])
+    
+    ii = -np.transpose(R_ij) @ np.transpose(R_i)
+    ij = np.transpose(R_ij) @ D_of_R @ (t_j - t_i)
+    row_1 = np.concatenate((ii, ij), axis=1)
+    row_2 = np.array([0,0,-1]).reshape(1,3)
+    A = np.concatenate((row_1, row_2), axis=0)
+
+    row_1_B = np.concatenate((np.transpose(R_ij) @ np.transpose(R_i), np.array([0,0]).reshape(2,1)), axis=1)
+    B = np.concatenate((row_1_B, np.array([0,0,1]).reshape(1,3)), axis=0)
 
     return e, A, B
+
+def derivative_of_R_transpose_wrt_theta(theta):
+    # d (R_i)^T / d theta_i
+    c = np.cos(theta)
+    s = np.sin(theta)
+
+    T = np.array([[-s, c], [-c, -s,]])
+    return T
 
 
 def linearize_pose_landmark_constraint(x, l, z):
@@ -397,5 +441,5 @@ def linearize_pose_landmark_constraint(x, l, z):
     """
 
 
-
-    return e, A, B
+    pass
+    # return e, A, B
