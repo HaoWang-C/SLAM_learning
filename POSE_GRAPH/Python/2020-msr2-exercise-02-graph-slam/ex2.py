@@ -161,13 +161,20 @@ def plot_graph(g):
             poseEdgesP2.append(g.x[toIdx:toIdx + 3])
 
         elif edge.Type == 'L':
-            landmarkEdgesP1.append(g.x[fromIdx:fromIdx + 2])
+            landmarkEdgesP1.append(g.x[fromIdx:fromIdx + 3])
             landmarkEdgesP2.append(g.x[toIdx:toIdx + 2])
+
+            
 
     poseEdgesP1 = np.stack(poseEdgesP1, axis=0)
     poseEdgesP2 = np.stack(poseEdgesP2, axis=0)
     plt.plot(np.concatenate((poseEdgesP1[:, 0], poseEdgesP2[:, 0])),
-             np.concatenate((poseEdgesP1[:, 1], poseEdgesP2[:, 1])), 'r')
+             np.concatenate((poseEdgesP1[:, 1], poseEdgesP2[:, 1])), 'b')
+    
+    # landmarkEdgesP1 = np.stack(landmarkEdgesP1, axis=0)
+    # landmarkEdgesP2 = np.stack(landmarkEdgesP2, axis=0)
+    # plt.plot([landmarkEdgesP1[:, 0], landmarkEdgesP2[:, 0]],
+    #          [landmarkEdgesP1[:, 1], landmarkEdgesP2[:, 1]], 'r--',alpha=0.3)
 
     plt.draw()
     plt.pause(1)
@@ -195,18 +202,31 @@ def get_poses_landmarks(g):
 
 def run_graph_slam(g, numIterations):
 
+    LM_lambda = 0.1
     # perform optimization
     for i in range(numIterations):
 
+        total_error = compute_global_error(g)
+        print("total error: ", total_error)
+        print("lambda: ", LM_lambda)
+        x_old = g.x
+
         # compute the incremental update dx of the state vector
-        dx = linearize_and_solve(g)
+        dx = linearize_and_solve(g, LM_lambda)
         # apply the solution to the state vector g.x
         g.x = (g.x.reshape(g.x.shape[0],1) + dx).reshape(g.x.shape[0],)
+
+        # update or not depending on LM_lambda
+        new_total_error = compute_global_error(g)
+        if(new_total_error < total_error):
+            LM_lambda /= 2
+        else:
+            LM_lambda *= 2
+            g.x = x_old
+        
         # plot graph
         plot_graph(g)
         # compute and print global error
-        total_error = compute_global_error(g)
-        print("total error: ", total_error)
         # terminate procedure if change is less than 10e-4
         if( total_error < 10e-4):
             break
@@ -247,27 +267,36 @@ def compute_global_error(g):
             e12 = t2v(inv(v2t(z12)) @ inv(v2t(x1)) @ v2t(x2)).reshape(3,1)
             Fx +=  np.transpose(e12) @ info12 @ e12
 
-        # # pose-pose constraint
-        # elif edge.Type == 'L':
+        # pose-pose constraint
+        elif edge.Type == 'L':
 
-        #     # compute idx for nodes using lookup table
-        #     fromIdx = g.lut[edge.fromNode]
-        #     toIdx = g.lut[edge.toNode]
+            # compute idx for nodes using lookup table
+            fromIdx = g.lut[edge.fromNode]
+            toIdx = g.lut[edge.toNode]
 
-        #     # get node states for the current edge
-        #     x = g.x[fromIdx:fromIdx + 3]
-        #     l = g.x[toIdx:toIdx + 2]
+            # get node states for the current edge
+            x = g.x[fromIdx:fromIdx + 3]
+            l = g.x[toIdx:toIdx + 2]
 
-        #     # get measurement and information matrix for the edge
-        #     z = edge.measurement
-        #     info12 = edge.information
+            # get measurement and information matrix for the edge
+            z = edge.measurement
+            info12 = edge.information
 
-        #     # (TODO) compute the error due to this edge
-
+            # (TODO) compute the error due to this edge
+            zil_hat = compute_l_in_x_frame(x, l)
+            eil = zil_hat - z.reshape(2,1)
+            Fx +=  np.transpose(eil) @ info12 @ eil
+            
     return Fx
 
+def compute_l_in_x_frame (x,l):
+    trans = x[0:2]
+    R = v2t(x)[0:2,0:2]
+    z_hat = np.transpose(R) @ (l-trans)
+    
+    return z_hat.reshape(2,1)
 
-def linearize_and_solve(g):
+def linearize_and_solve(g,LM_lambda):
     """ This function solves the least-squares problem for one iteration
         by linearizing the constraints 
 
@@ -349,16 +378,23 @@ def linearize_and_solve(g):
             e, A, B = linearize_pose_landmark_constraint(
                 x, l, edge.measurement)
 
-
             # (TODO) compute the terms
-            # b_i = 
-            # b_j = 
-            # H_ii = 
-            # H_ij = 
-            # H_jj = 
-
+            b_i = np.transpose(e) @ edge.information @ A
+            b_j = np.transpose(e) @ edge.information @ B
+            H_ii = np.transpose(A) @ edge.information @ A 
+            H_ij = np.transpose(A) @ edge.information @ B
+            H_ji = np.transpose(B) @ edge.information @ A
+            H_jj = np.transpose(B) @ edge.information @ B
+            
             # (TODO )add the terms to H matrix and b
-
+            b[:,fromIdx:fromIdx + 3] += b_i
+            b[:,toIdx:toIdx + 2] += b_j
+            
+            H[fromIdx:fromIdx + 3, fromIdx:fromIdx + 3] += H_ii
+            H[fromIdx:fromIdx + 3, toIdx:toIdx + 2] += H_ij
+            H[toIdx:toIdx + 2, fromIdx:fromIdx + 3] += H_ji
+            H[toIdx:toIdx + 2, toIdx:toIdx + 2] += H_jj
+            H += LM_lambda * np.eye(H.shape[0], H.shape[1])
 
     # solve system
     dx = np.linalg.solve(H, np.transpose(-b))
@@ -440,6 +476,16 @@ def linearize_pose_landmark_constraint(x, l, z):
     B : 2x2 Jacobian wrt l
     """
 
+    zil_hat = compute_l_in_x_frame(x, l)
+    e = zil_hat - z.reshape(2,1)
 
-    pass
-    # return e, A, B
+    
+    R_i = v2t(x)[0:2,0:2]
+    # d (R_i)^T / d theta_i
+    D_of_R = derivative_of_R_transpose_wrt_theta(x[2])
+    t = x[0:2]
+    
+    A = np.concatenate((-np.transpose(R_i), D_of_R @ (l-t).reshape(2,1)), axis=1)
+    B = np.transpose(R_i)
+
+    return e, A, B

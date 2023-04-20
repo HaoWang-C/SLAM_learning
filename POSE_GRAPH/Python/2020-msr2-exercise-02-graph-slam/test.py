@@ -1,13 +1,16 @@
 import ex2 as ex
 import numpy as np
+import pdb
 
 # load a dataset 
-filename = 'data/simulation-pose-pose.g2o'
+filename = 'data/dlr.g2o'
 graph = ex.read_graph_g2o(filename)
 
 # visualize the dataset
-# ex.plot_graph(graph)
-print('Loaded graph with {} nodes and {} edges'.format(len(graph.nodes), len(graph.edges)))
+# 41 pose
+# 36 landmarks
+# -> 195 state variables
+ex.plot_graph(graph)
 
 total_error = ex.compute_global_error(graph)
 print("Initial total error: ", total_error)
