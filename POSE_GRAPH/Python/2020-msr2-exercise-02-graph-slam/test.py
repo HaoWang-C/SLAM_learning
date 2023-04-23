@@ -2,7 +2,7 @@ import ex2 as ex
 import numpy as np
 import pdb
 
-# load a dataset 
+# load a dataset
 filename = 'data/dlr.g2o'
 graph = ex.read_graph_g2o(filename)
 
